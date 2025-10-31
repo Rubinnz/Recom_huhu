@@ -3,17 +3,13 @@ import streamlit as st
 import hashlib
 import mysql.connector
 from mysql.connector import Error
-
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# ========= Helpers (giữ nguyên hash như cũ) =========
 def hash_password(password: str) -> str:
-    """Hash password using SHA-256"""
     return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
-# ========= DB Config =========
 DB_CFG = {
     "host": os.getenv("MYSQL_ADDON_HOST"),
     "port": int(os.getenv("MYSQL_ADDON_PORT", "3306")),
@@ -43,50 +39,43 @@ def _ensure_users_table():
     cur = conn.cursor()
     cur.execute(sql)
     conn.commit()
-    cur.close(); conn.close()
+    cur.close()
+    conn.close()
 
 def verify_credentials(username: str, password: str):
-    """
-    Verify user credentials từ MySQL
-    Trả về (True, email) nếu hợp lệ; ngược lại (False, None)
-    """
     try:
         conn = _get_conn()
         cur = conn.cursor()
         cur.execute("SELECT password_hash, email FROM users WHERE username=%s", (username,))
         row = cur.fetchone()
         if not row:
-            cur.close(); conn.close()
+            cur.close()
+            conn.close()
             return False, None
-
         stored_hash, email = row
         ok = (hash_password(password) == stored_hash)
         if ok:
             cur.execute("UPDATE users SET last_login = NOW() WHERE username=%s", (username,))
             conn.commit()
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
         return ok, (email if ok else None)
     except Error as e:
         st.error(f"Không thể kết nối DB: {e}")
         return False, None
 
-# ========= UI (giữ nguyên layout/flow) =========
 def show_login():
     st.markdown('<div class="main-header">🎮 Video Game Recommender System</div>', unsafe_allow_html=True)
     _ensure_users_table()
-
-    # Center the login form
     col1, col2, col3 = st.columns([1, 2, 1])
-
     with col2:
         st.markdown("### 🔐 Đăng Nhập")
         st.markdown("---")
-
         with st.form("login_form"):
             username = st.text_input("👤 Tên đăng nhập", placeholder="Nhập tên đăng nhập của bạn")
             password = st.text_input("🔒 Mật khẩu", type="password", placeholder="Nhập mật khẩu của bạn")
 
-            c1, c2, c3 = st.columns([1,1,1])
+            space1, c1, c2, c3, space2 = st.columns([0.5, 1.5, 1.5, 1.5, 0.5])
             with c1:
                 submit_button = st.form_submit_button("Đăng nhập", type="primary", use_container_width=True)
             with c2:
@@ -108,15 +97,12 @@ def show_login():
                         st.rerun()
                     else:
                         st.error("❌ Tên đăng nhập hoặc mật khẩu không đúng!")
-
             if register_button:
                 st.session_state.page = "register"
                 st.rerun()
-
             if forgot_button:
                 st.session_state.page = "forgot"
                 st.rerun()
-
         st.markdown("---")
         st.markdown(
             "<div style='text-align: center; color: gray; font-size: 0.9em;'>"

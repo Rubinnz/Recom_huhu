@@ -1,14 +1,10 @@
-# utils/recommender_utils.py
 from __future__ import annotations
-
 import os, sys, types, pickle, time
 from typing import Iterable, Tuple, List, Any
-
 import numpy as np
 import pandas as pd
 import streamlit as st
 
-# ============ 1) MODEL LOADER "BỀN" ============
 def _try_joblib_load(path: str):
     import joblib
     return joblib.load(path)
@@ -29,78 +25,33 @@ def _try_pickle_with_alias(path: str):
     with open(path, "rb") as f:
         return _ModuleAliasUnpickler(f).load()
 
-from pathlib import Path
-
-def _is_lfs_pointer(p: str) -> bool:
-    try:
-        with open(p, "rb") as f:
-            head = f.read(64)
-        return head.startswith(b"version https://git-lfs.github.com/spec/v1")
-    except Exception:
-        return False
-
 @st.cache_resource(show_spinner=False)
 def load_cf_model(path: str):
-    """
-    Ưu tiên joblib (vì bạn đã dump bằng joblib).
-    Nếu không được, thử surprise.dump.load.
-    Chặn sớm nếu file đang là Git LFS pointer.
-    Cache sẽ tự invalid khi mtime thay đổi.
-    """
-    p = Path(path)
-    if not p.exists():
-        raise FileNotFoundError(f"Không tìm thấy CF model tại: {p}")
-
-    # thêm mtime vào cache key để khi file đổi sẽ reload
-    _ = p.stat().st_mtime
-
-    if _is_lfs_pointer(str(p)):
-        raise RuntimeError(
-            f"{p} là Git LFS pointer. Hãy chạy `git lfs pull && git lfs checkout` trên máy đang chạy app."
-        )
-
-    # 1) joblib (đúng cách bạn lưu)
-    try:
-        import joblib
-        return joblib.load(str(p))
-    except Exception as e_joblib:
-        joblib_err = e_joblib
-
-    # 2) surprise.dump (phòng khi bạn vô tình dump bằng surprise)
-    try:
-        from surprise import dump as sp_dump
-        obj = sp_dump.load(str(p))
-        return obj[0] if isinstance(obj, tuple) and obj else obj
-    except Exception as e_sur:
-        raise RuntimeError(
-            f"Không load được CF model.\n- joblib.load lỗi: {joblib_err}\n- surprise.dump.load lỗi: {e_sur}"
-        )
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Không tìm thấy CF model tại: {path}")
+    errors = []
+    for fn in (_try_joblib_load, _try_pickle_load, _try_pickle_with_alias):
+        try:
+            return fn(path)
+        except Exception as e:
+            errors.append(f"{fn.__name__}: {e}")
+    raise RuntimeError("Không load được CF model (có thể file bị lỗi hoặc không đúng định dạng joblib/pickle).\n" + "\n".join(errors))
 
 @st.cache_resource(show_spinner=False)
 def load_cb_model(path: str):
-    """
-    CB có thể là dict/tuple joblib. Cũng chặn LFS pointer và tự invalid theo mtime.
-    Nếu không load được sẽ trả None để fallback TF-IDF.
-    """
-    p = Path(path)
-    if not p.exists():
-        raise FileNotFoundError(f"Không tìm thấy CB model tại: {p}")
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Không tìm thấy CB model tại: {path}")
+    if "main" not in sys.modules:
+        fake_main = types.ModuleType("main")
+        class ContentBasedRecommender: pass
+        fake_main.ContentBasedRecommender = ContentBasedRecommender
+        sys.modules["main"] = fake_main
+    errors = []
+    for fn in (_try_joblib_load, _try_pickle_load, _try_pickle_with_alias):
+        try: return fn(path)
+        except Exception as e: errors.append(f"{fn.__name__}: {e}")
+    return None
 
-    _ = p.stat().st_mtime
-
-    if _is_lfs_pointer(str(p)):
-        raise RuntimeError(
-            f"{p} là Git LFS pointer. Hãy chạy `git lfs pull && git lfs checkout`."
-        )
-
-    try:
-        import joblib
-        return joblib.load(str(p))
-    except Exception:
-        # Trả None để code phía trên dùng fallback TF-IDF
-        return None
-
-# ============ 2) CF HELPERS ============
 def _surprise_predict_many(model: Any, user_id: str, item_ids: Iterable[str]) -> List[Tuple[str, float]]:
     preds = []
     for iid in item_ids:
@@ -112,7 +63,6 @@ def _surprise_predict_many(model: Any, user_id: str, item_ids: Iterable[str]) ->
     return preds
 
 def _detect_cols(df: pd.DataFrame):
-    """Ưu tiên game_id nếu có."""
     lower = {c.lower(): c for c in df.columns}
     uid = lower.get("user_id") or lower.get("userid") or lower.get("user") or "user_id"
     iid = lower.get("game_id") or lower.get("item_id") or lower.get("itemid") or lower.get("id") or "game_id"
@@ -127,11 +77,7 @@ def get_user_seen_items(ratings: pd.DataFrame | None, user_id: str) -> set[str]:
     sub = ratings[ratings[uid].astype(str) == str(user_id)]
     return set(sub[iid].astype(str).tolist())
 
-def get_cf_recommendations(model: Any,
-                           user_id: str,
-                           games: pd.DataFrame,
-                           ratings: pd.DataFrame | None = None,
-                           topn: int = 10) -> pd.DataFrame:
+def get_cf_recommendations(model: Any, user_id: str, games: pd.DataFrame, ratings: pd.DataFrame | None = None, topn: int = 10) -> pd.DataFrame:
     if model is None or games is None or games.empty:
         return pd.DataFrame()
     g = games.copy()
@@ -146,7 +92,6 @@ def get_cf_recommendations(model: Any,
     out = cand.merge(score_df, on="id", how="inner").sort_values("score", ascending=False)
     return out.head(topn)
 
-# ============ 3) CB HELPERS (fallback TF-IDF) ============
 def _build_fallback_cb_matrix(games: pd.DataFrame):
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.metrics.pairwise import cosine_similarity
@@ -183,56 +128,37 @@ def _infer_cb_structure(model: Any):
         if hasattr(model, attr): out["vectorizer"] = getattr(model, attr); break
     return out
 
-def get_cb_recommendations(model: Any,
-                           games: pd.DataFrame,
-                           seed_title: str,
-                           topn: int = 10,
-                           text_col: str = "genres") -> pd.DataFrame:
-    """
-    Gợi ý Content-Based: dùng model đã load hoặc fallback TF-IDF.
-    - text_col: cột text dùng để tính similarity (mặc định "genres").
-    - Có thể truyền "combined_text" = genres + description.
-    """
+def get_cb_recommendations(model: Any, games: pd.DataFrame, seed_title: str, topn: int = 10, text_col: str = "genres") -> pd.DataFrame:
     if games is None or games.empty:
         return pd.DataFrame()
     g = games.copy()
     if "title" not in g.columns:
         g["title"] = g["id"].astype(str)
-
-    # Xác định cột text
     if text_col not in g.columns:
         text_col = "genres"
     g[text_col] = g[text_col].fillna("").astype(str)
-
-    # Tìm index của seed
     try:
         seed_idx = g.index[g["title"] == seed_title][0]
     except Exception:
         return pd.DataFrame()
-
-    # Nếu model có vectorizer & matrix thì dùng
     info = _infer_cb_structure(model) if model is not None else {}
     if info.get("matrix") is not None and info.get("vectorizer") is not None:
         from sklearn.metrics.pairwise import cosine_similarity
         X = info["matrix"]
         sim = cosine_similarity(X[seed_idx], X).ravel()
     else:
-        # Fallback: build TF-IDF từ text_col
         from sklearn.feature_extraction.text import TfidfVectorizer
         from sklearn.metrics.pairwise import cosine_similarity
         vect = TfidfVectorizer(ngram_range=(1,2), min_df=2, max_df=0.95)
         X = vect.fit_transform(g[text_col])
         sim = cosine_similarity(X[seed_idx], X).ravel()
-
-    # Lấy top N game giống nhất
     order = np.argsort(sim)[::-1]
     order = [i for i in order if i != seed_idx][:topn]
     rec = g.iloc[order].copy()
     rec["score"] = sim[order]
     return rec
 
-# ============ 4) RATINGS I/O (CSV) ============
-DEFAULT_RATINGS_PATH = "game_ratings.csv"  # đổi sang "data/game_ratings.csv" nếu bạn muốn
+DEFAULT_RATINGS_PATH = "game_ratings.csv"
 
 def _read_ratings_df(ratings_path: str = DEFAULT_RATINGS_PATH) -> pd.DataFrame:
     if os.path.exists(ratings_path) and os.path.getsize(ratings_path) > 0:
