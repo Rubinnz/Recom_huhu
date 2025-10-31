@@ -29,36 +29,76 @@ def _try_pickle_with_alias(path: str):
     with open(path, "rb") as f:
         return _ModuleAliasUnpickler(f).load()
 
+from pathlib import Path
+
+def _is_lfs_pointer(p: str) -> bool:
+    try:
+        with open(p, "rb") as f:
+            head = f.read(64)
+        return head.startswith(b"version https://git-lfs.github.com/spec/v1")
+    except Exception:
+        return False
+
 @st.cache_resource(show_spinner=False)
 def load_cf_model(path: str):
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"Không tìm thấy CF model tại: {path}")
-    errors = []
-    for fn in (_try_joblib_load, _try_pickle_load, _try_pickle_with_alias):
-        try: return fn(path)
-        except Exception as e: errors.append(f"{fn.__name__}: {e}")
+    """
+    Ưu tiên joblib (vì bạn đã dump bằng joblib).
+    Nếu không được, thử surprise.dump.load.
+    Chặn sớm nếu file đang là Git LFS pointer.
+    Cache sẽ tự invalid khi mtime thay đổi.
+    """
+    p = Path(path)
+    if not p.exists():
+        raise FileNotFoundError(f"Không tìm thấy CF model tại: {p}")
+
+    # thêm mtime vào cache key để khi file đổi sẽ reload
+    _ = p.stat().st_mtime
+
+    if _is_lfs_pointer(str(p)):
+        raise RuntimeError(
+            f"{p} là Git LFS pointer. Hãy chạy `git lfs pull && git lfs checkout` trên máy đang chạy app."
+        )
+
+    # 1) joblib (đúng cách bạn lưu)
+    try:
+        import joblib
+        return joblib.load(str(p))
+    except Exception as e_joblib:
+        joblib_err = e_joblib
+
+    # 2) surprise.dump (phòng khi bạn vô tình dump bằng surprise)
     try:
         from surprise import dump as sp_dump
-        obj = sp_dump.load(path)
+        obj = sp_dump.load(str(p))
         return obj[0] if isinstance(obj, tuple) and obj else obj
-    except Exception as e:
-        errors.append(f"surprise.dump.load: {e}")
-    raise RuntimeError("Không load được CF model. Tried:\n" + "\n".join(errors))
+    except Exception as e_sur:
+        raise RuntimeError(
+            f"Không load được CF model.\n- joblib.load lỗi: {joblib_err}\n- surprise.dump.load lỗi: {e_sur}"
+        )
 
 @st.cache_resource(show_spinner=False)
 def load_cb_model(path: str):
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"Không tìm thấy CB model tại: {path}")
-    if "main" not in sys.modules:
-        fake_main = types.ModuleType("main")
-        class ContentBasedRecommender: pass
-        fake_main.ContentBasedRecommender = ContentBasedRecommender
-        sys.modules["main"] = fake_main
-    errors = []
-    for fn in (_try_joblib_load, _try_pickle_load, _try_pickle_with_alias):
-        try: return fn(path)
-        except Exception as e: errors.append(f"{fn.__name__}: {e}")
-    return None  # fallback TF-IDF khi None
+    """
+    CB có thể là dict/tuple joblib. Cũng chặn LFS pointer và tự invalid theo mtime.
+    Nếu không load được sẽ trả None để fallback TF-IDF.
+    """
+    p = Path(path)
+    if not p.exists():
+        raise FileNotFoundError(f"Không tìm thấy CB model tại: {p}")
+
+    _ = p.stat().st_mtime
+
+    if _is_lfs_pointer(str(p)):
+        raise RuntimeError(
+            f"{p} là Git LFS pointer. Hãy chạy `git lfs pull && git lfs checkout`."
+        )
+
+    try:
+        import joblib
+        return joblib.load(str(p))
+    except Exception:
+        # Trả None để code phía trên dùng fallback TF-IDF
+        return None
 
 # ============ 2) CF HELPERS ============
 def _surprise_predict_many(model: Any, user_id: str, item_ids: Iterable[str]) -> List[Tuple[str, float]]:
