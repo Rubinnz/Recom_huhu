@@ -1,4 +1,3 @@
-# home/cards.py
 import re
 import pandas as pd
 import streamlit as st
@@ -12,8 +11,10 @@ def _strip_html(s: str) -> str:
     return _TAG_RE.sub("", s).replace("&nbsp;", " ").strip()
 
 def _contains_any(cell: str, selected: list[str]) -> bool:
-    if not selected: return True
-    if not isinstance(cell, str): return False
+    if not selected:
+        return True
+    if not isinstance(cell, str):
+        return False
     s = {t.strip().lower() for t in cell.split(",")}
     return any(x.lower() in s for x in selected)
 
@@ -37,31 +38,38 @@ def render_game_cards(page_df: pd.DataFrame, start_index: int, key_prefix: str =
             with cols[idx]:
                 st.markdown('<div class="game-card">', unsafe_allow_html=True)
                 img = str(g.get("cover_image", "")).strip()
+
                 if img:
-                    st.image(img, width="stretch")
+                    st.markdown(
+                        f"<img src='{img}' style='width:100%; height:200px; object-fit:cover; border-radius:10px;'>",
+                        unsafe_allow_html=True
+                    )
                 else:
-                    st.image("https://via.placeholder.com/400x200.png?text=No+Image", width="stretch")
+                    st.markdown(
+                        "<img src='https://via.placeholder.com/400x200.png?text=No+Image' "
+                        "style='width:100%; height:200px; object-fit:cover; border-radius:10px;'>",
+                        unsafe_allow_html=True
+                    )
 
                 title = g.get("title") or "Unknown Game"
                 st.markdown(f"<h4>{title}</h4>", unsafe_allow_html=True)
 
-                meta = " · ".join(
-                    m for m in [
-                        f"🕹️ {g.get('genres')}" if g.get("genres") else "",
-                        f"💻 {g.get('platforms')}" if g.get("platforms") else ""
-                    ] if m
-                )
-                if meta:
-                    st.markdown(f"<div class='game-meta'>{meta}</div>", unsafe_allow_html=True)
+                genres_str = f"🕹️ {g.get('genres')}" if g.get("genres") else ""
+                if genres_str:
+                    st.markdown(f"<div class='game-meta'>{genres_str}</div>", unsafe_allow_html=True)
 
-                desc = _strip_html(g.get("description", "")) or "Chưa có mô tả."
-                st.caption(desc[:160] + ("..." if len(desc) > 160 else ""))
+                platforms_str = f"💻 {g.get('platforms')}" if g.get("platforms") else ""
+                if platforms_str:
+                    st.markdown(f"<div class='game-meta'>{platforms_str}</div>", unsafe_allow_html=True)
 
-                # Key duy nhất để tránh StreamlitDuplicateElementKey
+                desc = _strip_html(g.get("description", "")) or "No description yet."
+                desc_limit = 120
+                st.caption(desc[:desc_limit] + ("..." if len(desc) > desc_limit else ""))
+
                 safe_id = str(g.get("id", "NA"))
                 button_key = f"{key_prefix}detail_{start_index}_{idx}_{row_idx}_{safe_id}"
 
-                if st.button("📖 Xem chi tiết", key=button_key, width="stretch"):
+                if st.button("📖 View details", key=button_key, use_container_width=True):
                     set_view("detail", str(g["id"]))
                     request_scroll_to_top()
                     st.rerun()

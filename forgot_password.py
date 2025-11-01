@@ -25,14 +25,16 @@ def update_password(email, new_password):
     try:
         conn = _get_conn()
         cur = conn.cursor()
-        cur.execute("UPDATE users SET password_hash=%s WHERE email=%s",
-                    (hash_password(new_password), email))
+        cur.execute(
+            "UPDATE users SET password_hash=%s WHERE email=%s",
+            (hash_password(new_password), email)
+        )
         conn.commit()
         cur.close()
         conn.close()
         return True
     except Error as e:
-        st.error(f"Lỗi: {e}")
+        st.error(f"Error: {e}")
         return False
 
 def show_forgot_password():
@@ -62,30 +64,30 @@ def show_forgot_password():
     </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="main-header">🔑 Quên mật khẩu</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header">🔑 Forgot Password</div>', unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.markdown("<h4 style='text-align:center;'>Khôi phục mật khẩu</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='text-align:center;'>Reset your password</h4>", unsafe_allow_html=True)
         with st.form("forgot_form"):
-            email = st.text_input("📧 Nhập email của bạn", placeholder="example@gmail.com")
-            new_pass = st.text_input("🔒 Mật khẩu mới", type="password", placeholder="Nhập mật khẩu mới")
-            confirm = st.text_input("✅ Xác nhận mật khẩu mới", type="password", placeholder="Nhập lại mật khẩu")
+            email = st.text_input("📧 Enter your email", placeholder="example@gmail.com")
+            new_pass = st.text_input("🔒 New password", type="password", placeholder="Enter new password")
+            confirm = st.text_input("✅ Confirm new password", type="password", placeholder="Re-enter new password")
 
             st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
             space1, c1, c2, space2 = st.columns([1, 2, 2, 1])
             with c1:
-                reset_btn = st.form_submit_button("Đặt lại mật khẩu", type="primary", use_container_width=True)
+                reset_btn = st.form_submit_button("Reset password", type="primary", use_container_width=True)
             with c2:
-                back_btn = st.form_submit_button("Quay lại", use_container_width=True)
+                back_btn = st.form_submit_button("Back", use_container_width=True)
 
             if reset_btn:
                 if not email or not new_pass:
-                    st.error("⚠️ Vui lòng nhập đủ thông tin!")
+                    st.error("⚠️ Please fill out all fields!")
                 elif new_pass != confirm:
-                    st.error("❌ Mật khẩu xác nhận không trùng khớp!")
+                    st.error("❌ Password confirmation does not match!")
                 else:
                     if update_password(email, new_pass):
-                        st.success("✅ Cập nhật mật khẩu thành công!")
+                        st.success("✅ Password updated successfully!")
                         st.session_state.page = "login"
                         st.rerun()
 

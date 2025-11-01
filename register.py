@@ -25,14 +25,16 @@ def create_user(username: str, password: str, email: str):
     try:
         conn = _get_conn()
         cur = conn.cursor()
-        cur.execute("INSERT INTO users (username, password_hash, email) VALUES (%s, %s, %s)",
-                    (username, hash_password(password), email))
+        cur.execute(
+            "INSERT INTO users (username, password_hash, email) VALUES (%s, %s, %s)",
+            (username, hash_password(password), email)
+        )
         conn.commit()
         cur.close()
         conn.close()
         return True
     except Error as e:
-        st.error(f"Lỗi: {e}")
+        st.error(f"Error: {e}")
         return False
 
 def show_register():
@@ -63,31 +65,31 @@ def show_register():
     </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="main-header">📝 Tạo tài khoản mới</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header">📝 Create a new account</div>', unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.markdown("<h4 style='text-align:center;'>Đăng Ký</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='text-align:center;'>Register</h4>", unsafe_allow_html=True)
         with st.form("register_form"):
-            username = st.text_input("👤 Tên đăng nhập", placeholder="Tối thiểu 3 ký tự")
+            username = st.text_input("👤 Username", placeholder="At least 3 characters")
             email = st.text_input("📧 Email", placeholder="example@gmail.com")
-            password = st.text_input("🔒 Mật khẩu", type="password", placeholder="Nhập mật khẩu")
-            confirm = st.text_input("✅ Xác nhận mật khẩu", type="password", placeholder="Nhập lại mật khẩu")
+            password = st.text_input("🔒 Password", type="password", placeholder="Enter password")
+            confirm = st.text_input("✅ Confirm password", type="password", placeholder="Re-enter password")
 
             st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
             space1, c1, c2, space2 = st.columns([1, 2, 2, 1])
             with c1:
-                register_button = st.form_submit_button("Tạo tài khoản", type="primary", use_container_width=True)
+                register_button = st.form_submit_button("Create account", type="primary", use_container_width=True)
             with c2:
-                back_button = st.form_submit_button("Quay lại", use_container_width=True)
+                back_button = st.form_submit_button("Back", use_container_width=True)
 
             if register_button:
                 if not username or not password or not email:
-                    st.error("⚠️ Điền đầy đủ thông tin!")
+                    st.error("⚠️ Please fill out all fields!")
                 elif password != confirm:
-                    st.error("❌ Mật khẩu xác nhận không trùng khớp!")
+                    st.error("❌ Password confirmation does not match!")
                 else:
                     if create_user(username, password, email):
-                        st.success("✅ Tạo tài khoản thành công! Hãy đăng nhập.")
+                        st.success("✅ Account created successfully! Please log in.")
                         st.session_state.page = "login"
                         st.rerun()
 

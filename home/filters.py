@@ -17,10 +17,10 @@ def render_filter_bar(games: pd.DataFrame):
 
     c1, c2, c3 = st.columns([1, 1, 2])
     with c1:
-        selected_genres = st.multiselect("📂 Thể loại", options=all_genres, default=[], key="f_genres")
+        selected_genres = st.multiselect("📂 Genres", options=all_genres, default=[], key="f_genres")
     with c2:
-        selected_plats = st.multiselect("💻 Nền tảng", options=all_plats, default=[], key="f_plats")
+        selected_plats = st.multiselect("💻 Platforms", options=all_plats, default=[], key="f_plats")
     with c3:
-        search_kw = st.text_input("🔎 Tìm theo tên game", value="", placeholder="nhập từ khoá…", key="f_kw")
+        search_kw = st.text_input("🔎 Search by game name", value="", placeholder="enter keyword…", key="f_kw")
 
     return selected_genres, selected_plats, search_kw

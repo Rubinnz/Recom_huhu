@@ -21,7 +21,7 @@ DB_CFG = {
 def _get_conn():
     missing = [k for k, v in DB_CFG.items() if not v]
     if missing:
-        raise RuntimeError(f"Thiếu cấu hình DB: {missing}. Hãy set biến môi trường Clever Cloud.")
+        raise RuntimeError(f"Missing DB config: {missing}. Set Clever Cloud environment variables.")
     return mysql.connector.connect(**DB_CFG)
 
 def _ensure_users_table():
@@ -61,7 +61,7 @@ def verify_credentials(username: str, password: str):
         conn.close()
         return ok, (email if ok else None)
     except Error as e:
-        st.error(f"Không thể kết nối DB: {e}")
+        st.error(f"Unable to connect to DB: {e}")
         return False, None
 
 def show_login():
@@ -69,23 +69,23 @@ def show_login():
     _ensure_users_table()
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.markdown("### 🔐 Đăng Nhập")
+        st.markdown("### 🔐 Log In")
         st.markdown("---")
         with st.form("login_form"):
-            username = st.text_input("👤 Tên đăng nhập", placeholder="Nhập tên đăng nhập của bạn")
-            password = st.text_input("🔒 Mật khẩu", type="password", placeholder="Nhập mật khẩu của bạn")
+            username = st.text_input("👤 Username", placeholder="Enter your username")
+            password = st.text_input("🔒 Password", type="password", placeholder="Enter your password")
 
             space1, c1, c2, c3, space2 = st.columns([0.5, 1.5, 1.5, 1.5, 0.5])
             with c1:
-                submit_button = st.form_submit_button("Đăng nhập", type="primary", use_container_width=True)
+                submit_button = st.form_submit_button("Log In", type="primary", use_container_width=True)
             with c2:
-                register_button = st.form_submit_button("Đăng ký", use_container_width=True)
+                register_button = st.form_submit_button("Register", use_container_width=True)
             with c3:
-                forgot_button = st.form_submit_button("Quên mật khẩu?", use_container_width=True)
+                forgot_button = st.form_submit_button("Forgot password?", use_container_width=True)
 
             if submit_button:
                 if not username or not password:
-                    st.error("⚠️ Vui lòng nhập đầy đủ thông tin!")
+                    st.error("⚠️ Please fill out all fields!")
                 else:
                     ok, email = verify_credentials(username, password)
                     if ok:
@@ -93,10 +93,10 @@ def show_login():
                         st.session_state.username = username
                         st.session_state.email = email or ""
                         st.session_state.page = "home"
-                        st.success(f"✅ Đăng nhập thành công! Chào mừng {username}!")
+                        st.success(f"✅ Login successful! Welcome, {username}!")
                         st.rerun()
                     else:
-                        st.error("❌ Tên đăng nhập hoặc mật khẩu không đúng!")
+                        st.error("❌ Invalid username or password!")
             if register_button:
                 st.session_state.page = "register"
                 st.rerun()
@@ -106,7 +106,7 @@ def show_login():
         st.markdown("---")
         st.markdown(
             "<div style='text-align: center; color: gray; font-size: 0.9em;'>"
-            "Chưa có tài khoản? Nhấn nút Đăng ký ở trên"
+            "Don't have an account? Click Register above."
             "</div>",
             unsafe_allow_html=True
         )
