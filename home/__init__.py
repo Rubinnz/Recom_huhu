@@ -6,14 +6,14 @@ from .styles import inject_styles
 from .state import (
     PAGE_SIZE, get_current_page, set_page,
     reset_page_if_filter_changed, request_scroll_to_top,
-    scroll_to_top_after_render, get_view, set_view, sync_view_from_query
+    scroll_to_top_after_render, sync_view_from_query
 )
 from .filters import render_filter_bar
 from .cards import filter_games, render_game_cards
 from .detail import render_detail_page
 from utils.recommender_utils import (
     load_hybrid_model, hybrid_top_recommendations,
-    hybrid_grouped_recommendations, played_game_ids
+    hybrid_grouped_recommendations
 )
 
 HYBRID_PATH = "hybrid_model.pkl"
@@ -120,34 +120,26 @@ def show_home():
         if hasattr(model, "all_users"):
             user_list = sorted(list(map(str, model.all_users)))
         if not user_list:
-            st.warning("⚠️ Không tìm thấy danh sách user từ mô hình — sẽ dùng chế độ cold-start.")
-            user_id = None
-        else:
-            user_options = ["-- New User (Cold Start) --"] + user_list
-            user_choice = st.selectbox("👤 Chọn user_id", user_options, index=0)
-            if user_choice == "-- New User (Cold Start) --":
-                user_id = None
-                st.info("🆕 Đang dùng chế độ cold-start (người dùng mới).")
-            else:
-                user_id = user_choice
-                st.success(f"✅ Đã chọn user: {user_id}")
+            st.error("Không tìm thấy danh sách người dùng trong mô hình.")
+            return
+        user_id = st.selectbox("👤 Chọn user_id", user_list, index=0)
         k = st.number_input("Number of recommendations", min_value=5, max_value=50, value=10, step=1)
         if st.button("Get Recommendations", use_container_width=True):
             with st.spinner("Getting recommendations..."):
                 try:
-                    recs = hybrid_top_recommendations(model, user_id=user_id if user_id else None, n=int(k))
-                    st.success(f"✅ Got {len(recs)} recommendations")
+                    recs = hybrid_top_recommendations(model, user_id=user_id, n=int(k))
                     if not recs.empty:
                         merged = _merge_recs(recs, games)
                         if not merged.empty:
-                            st.write(f"**Top {len(merged)} recommendations for {user_id or 'New User'}:**")
+                            st.write(f"**Top {len(merged)} recommendations for {user_id}:**")
                             render_game_cards(merged, 0)
                         else:
-                            st.info("No suitable recommendations found.")
+                            st.info("No matching game details found.")
                     else:
                         st.info("No recommendations found.")
                 except Exception as e:
                     st.error(f"❌ Error: {str(e)}")
+
         st.markdown("---")
         st.caption("Recommendations by Theme Group")
         try:

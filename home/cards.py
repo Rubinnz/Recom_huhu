@@ -1,7 +1,8 @@
 import re
+import uuid
 import pandas as pd
 import streamlit as st
-from .state import request_scroll_to_top, set_view
+from .state import request_scroll_to_top
 
 _TAG_RE = re.compile(r"<[^>]+>")
 
@@ -56,7 +57,8 @@ def render_game_cards(page_df: pd.DataFrame, start_index: int, key_prefix: str =
                 desc_limit = 100
                 st.caption(desc[:desc_limit] + ("..." if len(desc) > desc_limit else ""))
                 safe_id = str(g.get("id", "NA")).strip()
-                button_key = f"{key_prefix}detail_{start_index}_{idx}_{row_idx}_{safe_id}"
+                unique_suffix = str(uuid.uuid4())[:8]
+                button_key = f"{key_prefix}detail_{start_index}_{idx}_{row_idx}_{safe_id}_{unique_suffix}"
                 if st.button("📖 View details", key=button_key, use_container_width=True):
                     gid = str(g.get("id", "")).strip()
                     if gid and gid.lower() != "na":
