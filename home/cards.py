@@ -26,7 +26,7 @@ def filter_games(games: pd.DataFrame, genres: list[str], plats: list[str], kw: s
         df = df[df["platforms"].apply(lambda s: _contains_any(s, plats))]
     kw = (kw or "").strip()
     if kw:
-        df = df[df["title"].str.contains(kw, case=False, na=False)]
+        df = df[df["title"] == kw]
     return df
 
 def render_game_cards(page_df: pd.DataFrame, start_index: int, key_prefix: str = ""):
@@ -52,6 +52,8 @@ def render_game_cards(page_df: pd.DataFrame, start_index: int, key_prefix: str =
                     )
 
                 title = g.get("title") or "Unknown Game"
+                if len(title) > 35:
+                    title = title[:35] + "..."
                 st.markdown(f"<h4>{title}</h4>", unsafe_allow_html=True)
 
                 genres_str = f"🕹️ {g.get('genres')}" if g.get("genres") else ""
@@ -63,7 +65,7 @@ def render_game_cards(page_df: pd.DataFrame, start_index: int, key_prefix: str =
                     st.markdown(f"<div class='game-meta'>{platforms_str}</div>", unsafe_allow_html=True)
 
                 desc = _strip_html(g.get("description", "")) or "No description yet."
-                desc_limit = 120
+                desc_limit = 100
                 st.caption(desc[:desc_limit] + ("..." if len(desc) > desc_limit else ""))
 
                 safe_id = str(g.get("id", "NA"))
