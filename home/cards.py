@@ -29,7 +29,7 @@ def filter_games(games: pd.DataFrame, genres: list[str], plats: list[str], kw: s
         df = df[df["title"] == kw]
     return df
 
-def render_game_cards(page_df: pd.DataFrame, start_index: int, key_prefix: str = ""):
+def render_game_cards(page_df: pd.DataFrame, start_index: int, key_prefix: str = "cards_"):
     n_cols = 3
     rows = [page_df.iloc[i:i+n_cols] for i in range(0, len(page_df), n_cols)]
     for row in rows:
@@ -69,7 +69,7 @@ def render_game_cards(page_df: pd.DataFrame, start_index: int, key_prefix: str =
                 st.caption(desc[:desc_limit] + ("..." if len(desc) > desc_limit else ""))
 
                 safe_id = str(g.get("id", "NA"))
-                button_key = f"{key_prefix}detail_{start_index}_{idx}_{row_idx}_{safe_id}"
+                button_key = f"{key_prefix}{start_index}_{idx}_{row_idx}_{safe_id}"
 
                 if st.button("📖 View details", key=button_key, use_container_width=True):
                     set_view("detail", str(g["id"]))

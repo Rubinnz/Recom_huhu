@@ -93,7 +93,7 @@ def show_home():
         page = get_current_page(total_pages)
         start = (page - 1) * PAGE_SIZE
         end = start + PAGE_SIZE
-        render_game_cards(filtered_df.iloc[start:end], start)
+        render_game_cards(filtered_df.iloc[start:end], start, key_prefix="list_")
         st.markdown("<div class='pager'>", unsafe_allow_html=True)
         sp1, col1, col2, col3, sp2 = st.columns([1.5, 1, 0.4, 1, 1.5], gap="small")
         with col1:
@@ -131,7 +131,7 @@ def show_home():
                     merged = _merge_recommendations(recs, games)
                     if not merged.empty:
                         st.success(f"Top {len(merged)} recommendations for user {user_id}:")
-                        render_game_cards(merged, 0)
+                        render_game_cards(merged, 0, key_prefix=f"recs_{user_id}_")
                     else:
                         st.info("No matching games found.")
                 else:
@@ -150,6 +150,6 @@ def show_home():
                 merged = _merge_recommendations(df, games)
                 if not merged.empty:
                     st.markdown(f"**{group_title}**")
-                    render_game_cards(merged, 0)
+                    render_game_cards(merged, 0, key_prefix=f"group_{group_title}_")
         else:
             st.info("No grouped recommendations available.")
