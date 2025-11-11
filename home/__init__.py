@@ -16,7 +16,7 @@ from utils.recommender_utils import (
     hybrid_grouped_recommendations, played_game_ids
 )
 
-HYBRID_PATH = "hybrid_recommender_netflix.pkl"
+HYBRID_PATH = "hybrid_model.pkl"
 _TAG_RE = re.compile(r"<[^>]+>")
 
 def _strip_html(s: str) -> str:
