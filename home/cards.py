@@ -38,42 +38,29 @@ def render_game_cards(page_df: pd.DataFrame, start_index: int, key_prefix: str =
             with cols[idx]:
                 st.markdown('<div class="game-card">', unsafe_allow_html=True)
                 img = str(g.get("cover_image", "")).strip()
-
                 if img:
-                    st.markdown(
-                        f"<img src='{img}' style='width:100%; height:200px; object-fit:cover; border-radius:10px;'>",
-                        unsafe_allow_html=True
-                    )
+                    st.markdown(f"<img src='{img}' style='width:100%; height:200px; object-fit:cover; border-radius:10px;'>", unsafe_allow_html=True)
                 else:
-                    st.markdown(
-                        "<img src='https://via.placeholder.com/400x200.png?text=No+Image' "
-                        "style='width:100%; height:200px; object-fit:cover; border-radius:10px;'>",
-                        unsafe_allow_html=True
-                    )
-
+                    st.markdown("<img src='https://via.placeholder.com/400x200.png?text=No+Image' style='width:100%; height:200px; object-fit:cover; border-radius:10px;'>", unsafe_allow_html=True)
                 title = g.get("title") or "Unknown Game"
                 if len(title) > 35:
                     title = title[:35] + "..."
                 st.markdown(f"<h4>{title}</h4>", unsafe_allow_html=True)
-
                 genres_str = f"🕹️ {g.get('genres')}" if g.get("genres") else ""
                 if genres_str:
                     st.markdown(f"<div class='game-meta'>{genres_str}</div>", unsafe_allow_html=True)
-
                 platforms_str = f"💻 {g.get('platforms')}" if g.get("platforms") else ""
                 if platforms_str:
                     st.markdown(f"<div class='game-meta'>{platforms_str}</div>", unsafe_allow_html=True)
-
                 desc = _strip_html(g.get("description", "")) or "No description yet."
                 desc_limit = 100
                 st.caption(desc[:desc_limit] + ("..." if len(desc) > desc_limit else ""))
-
-                safe_id = str(g.get("id", "NA"))
+                safe_id = str(g.get("id", "NA")).strip()
                 button_key = f"{key_prefix}detail_{start_index}_{idx}_{row_idx}_{safe_id}"
-
                 if st.button("📖 View details", key=button_key, use_container_width=True):
-                    set_view("detail", str(g["id"]))
-                    request_scroll_to_top()
-                    st.rerun()
-
+                    gid = str(g.get("id", "")).strip()
+                    if gid and gid.lower() != "na":
+                        st.query_params.update(id=gid)
+                        request_scroll_to_top()
+                        st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
