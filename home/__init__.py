@@ -177,7 +177,15 @@ def show_home():
             for group_title, df in grouped.items():
                 merged = _merge_recommendations(df, games)
                 if not merged.empty:
-                    st.markdown(f"**{group_title}**")
+                    if "id" not in merged.columns and "game_id" in merged.columns:
+                        merged["id"] = merged["game_id"].astype(str)
+                    merged["id"] = merged["id"].astype(str)
+                    merged = merged.dropna(subset=["id"])
+                    
+                    st.write(f"**Top {len(merged)} recommendations for {user_id or 'New User'}:**")
                     render_game_cards(merged, 0)
+                else:
+                    st.info("No suitable recommendations found or games data missing.")
+
         else:
             st.info("No grouped recommendations available.")
