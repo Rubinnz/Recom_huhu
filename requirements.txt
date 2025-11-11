@@ -17,6 +17,6 @@ typing_extensions==4.15.0
 tzdata==2025.2
 urllib3==2.5.0
 watchdog==6.0.0
-mysql-connector-python==9.5.0
+mysql-connector-python==9.4.0
 python-dotenv==1.2.1
 joblib==1.5.2
