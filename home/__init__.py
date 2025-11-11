@@ -6,14 +6,14 @@ from .styles import inject_styles
 from .state import (
     PAGE_SIZE, get_current_page, set_page,
     reset_page_if_filter_changed, request_scroll_to_top,
-    scroll_to_top_after_render, get_view, set_view, sync_view_from_query
+    scroll_to_top_after_render, sync_view_from_query
 )
 from .filters import render_filter_bar
 from .cards import filter_games, render_game_cards
 from .detail import render_detail_page
 from utils.recommender_utils import (
     load_hybrid_model, hybrid_top_recommendations,
-    hybrid_grouped_recommendations, played_game_ids
+    hybrid_grouped_recommendations
 )
 
 HYBRID_PATH = "hybrid_model.pkl"
@@ -89,6 +89,9 @@ def show_home():
 
     tab1, tab2 = st.tabs(["📋 Game List", "🎯 Personalized Recommendations"])
 
+    # =============================
+    # TAB 1: GAME LIST
+    # =============================
     with tab1:
         st.subheader("All Games 🎮")
         selected_genres, selected_platforms, search_keyword = render_filter_bar(games)
@@ -110,95 +113,71 @@ def show_home():
             if st.button("⬅️ Previous Page", disabled=page <= 1, key="prev_btn", use_container_width=True):
                 set_page(page - 1)
                 request_scroll_to_top()
-
         with col2:
             st.markdown(
                 f"<p style='text-align:center; font-weight:600; font-size:1rem;'>Page {page}/{total_pages}</p>",
                 unsafe_allow_html=True
             )
-
         with col3:
             if st.button("Next Page ➡️", disabled=page >= total_pages, key="next_btn", use_container_width=True):
                 set_page(page + 1)
                 request_scroll_to_top()
-
         st.markdown("</div>", unsafe_allow_html=True)
 
+    # =============================
+    # TAB 2: RECOMMENDATIONS
+    # =============================
     with tab2:
         st.subheader("Personalized Game Recommendations")
         model = _load_hybrid()
+
+        if model is None:
+            st.warning("Hybrid model not found or failed to load.")
+            return
 
         user_list = []
         if hasattr(model, "all_users"):
             user_list = sorted(list(map(str, model.all_users)))
 
         if not user_list:
-            st.warning("⚠️ No user list found in the model — using cold-start mode.")
+            st.warning("No user list available in the model.")
             user_id = None
         else:
-            user_options = ["-- New User (Cold Start) --"] + user_list
-            user_choice = st.selectbox("👤 Select user_id", user_options, index=0)
-            if user_choice == "-- New User (Cold Start) --":
-                user_id = None
-                st.info("🆕 Using cold-start mode for a new user.")
-            else:
-                user_id = user_choice
-                st.success(f"✅ Selected user: {user_id}")
+            user_id = st.selectbox("Select User ID", user_list, index=0)
 
-        k = st.number_input("Number of recommendations", min_value=5, max_value=50, value=10, step=1)
+        k = st.number_input("Number of Recommendations", min_value=5, max_value=50, value=10, step=1)
 
         if st.button("Get Recommendations", use_container_width=True):
-            if model is None:
-                st.warning("Hybrid model not found or failed to load.")
-            else:
-                with st.expander("🔍 Debug Info", expanded=False):
-                    st.write(f"**Model type:** {type(model)}")
-                    st.write(f"**Model methods:** {[m for m in dir(model) if not m.startswith('_')]}")
-                    st.write(f"**User ID:** {user_id}")
-                    st.write(f"**Requested recommendations:** {k}")
+            try:
+                with st.spinner("Generating recommendations..."):
+                    recs = hybrid_top_recommendations(model, user_id=user_id, n=int(k))
 
-                try:
-                    with st.spinner("Generating recommendations..."):
-                        recs = hybrid_top_recommendations(
-                            model,
-                            user_id=user_id if user_id else None,
-                            n=int(k)
-                        )
-
-                    st.success(f"✅ Retrieved {len(recs)} recommendations")
-
-                    with st.expander("📊 Raw Recommendations Data", expanded=False):
-                        st.dataframe(recs)
-
-                    merged = _merge_recommendations(recs, games) if isinstance(recs, pd.DataFrame) and not recs.empty else pd.DataFrame()
+                if isinstance(recs, pd.DataFrame) and not recs.empty:
+                    merged = _merge_recommendations(recs, games)
                     if not merged.empty:
-                        st.write(f"**Top {len(merged)} recommendations for {user_id or 'New User'}:**")
+                        st.success(f"Top {len(merged)} recommendations for user {user_id}:")
                         render_game_cards(merged, 0)
                     else:
-                        st.info("No suitable recommendations found or game data missing.")
-                except Exception as e:
-                    st.error(f"❌ Error: {str(e)}")
-                    with st.expander("🐛 Full Error Traceback", expanded=False):
-                        import traceback
-                        st.code(traceback.format_exc())
+                        st.info("No matching games found.")
+                else:
+                    st.warning("No recommendations generated.")
+            except Exception as e:
+                st.error(f"Error generating recommendations: {e}")
 
         st.markdown("---")
-        st.caption("Recommendations by Theme Group")
+        st.caption("Grouped Recommendations by Theme")
 
-        if model is None:
-            st.warning("Hybrid model not found.")
+        try:
+            grouped = hybrid_grouped_recommendations(model, user_id, per_seed=4)
+        except Exception as e:
+            st.error(f"Error generating grouped recommendations: {e}")
+            grouped = {}
+
+        if isinstance(grouped, dict) and grouped:
+            for group_title, df in grouped.items():
+                merged = _merge_recommendations(df, games)
+                if not merged.empty:
+                    st.markdown(f"**{group_title}**")
+                    render_game_cards(merged, 0)
         else:
-            try:
-                grouped = hybrid_grouped_recommendations(model, user_id, per_seed=4)
-            except Exception as e:
-                st.error(f"Error generating grouped recommendations: {e}")
-                grouped = {}
-
-            if isinstance(grouped, dict) and grouped:
-                for group_title, df in grouped.items():
-                    merged = _merge_recommendations(df, games)
-                    if not merged.empty:
-                        st.markdown(f"**{group_title}**")
-                        render_game_cards(merged, 0)
-            else:
-                st.info("No grouped recommendations available.")
+            st.info("No grouped recommendations available.")
